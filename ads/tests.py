@@ -1,4 +1,3 @@
-import pytest
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -7,7 +6,6 @@ from ads.models import Ads, Review
 from users.models import User
 
 
-@pytest.mark.django_db
 class AdsCaseTest(APITestCase):
     def setUp(self):
         self.user = User.objects.create(email="test@mail.ru", password="password")
@@ -82,7 +80,6 @@ class AdsCaseTest(APITestCase):
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
-@pytest.mark.django_db
 class ReviewCaseTest(APITestCase):
     def setUp(self):
         self.user = User.objects.create(email="test@mail.ru", password="password")

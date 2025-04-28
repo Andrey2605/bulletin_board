@@ -1,5 +1,4 @@
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import permissions
+from rest_framework import filters, permissions
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.viewsets import ModelViewSet
 
@@ -13,8 +12,8 @@ class AdsViewSet(ModelViewSet):
     queryset = Ads.objects.all()
     pagination_class = CustomPagination
 
-    filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ("title",)  # Укажите поля, по которым хотите фильтровать
+    filter_backends = (filters.SearchFilter,)
+    search_fields = ("title",)  # Укажите поля, по которым хотите фильтровать
 
     def get_permissions(self):
         if self.request.method == "GET":

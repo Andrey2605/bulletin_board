@@ -1,139 +1,144 @@
 import pytest
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient  # Импортируем APIClient
 
 from ads.models import Ads, Review
 from users.models import User
 
 
-@pytest.mark.django_db
-class AdsCaseTest(APITestCase):
-    def setUp(self):
-        self.user = User.objects.create(email="test@mail.ru", password="password")
-        self.client.force_authenticate(user=self.user)
+@pytest.fixture
+def user():
+    return User.objects.create(email="test@mail.ru", password="password")
 
-    def test_create_ads(self):
-        response = self.client.post(
-            reverse("ads:ads-list"),
-            {
-                "title": "New Ads",
-                "price": 150,
-                "description": "Description of new ads.",
-            },
-        )
 
-        assert response.status_code == status.HTTP_201_CREATED
-        assert response.data["title"] == "New Ads"
+@pytest.fixture
+def authenticated_client(user):
+    client = APIClient()  # Создаем экземпляр APIClient
+    client.force_authenticate(user=user)  # Аутентифицируем пользователя
+    return client
 
-    def test_list_ads(self):
-        # Создаем несколько объявлений
-        Ads.objects.create(
-            title="Ads 1", price=100, description="First ads", author=self.user
-        )
-        Ads.objects.create(
-            title="Ads 2", price=200, description="Second ads", author=self.user
-        )
 
-        response = self.client.get(reverse("ads:ads-list"))
-
-        assert response.status_code == status.HTTP_200_OK
-
-    def test_retrieve_ads(self):
-        ads = Ads.objects.create(
-            title="Test Ads",
-            price=100,
-            description="Test description",
-            author=self.user,
-        )
-
-        response = self.client.get(reverse("ads:ads-detail", args=[ads.id]))
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["title"] == "Test Ads"
-
-    def test_update_ads(self):
-        ads = Ads.objects.create(
-            title="Old Title",
-            price=100,
-            description="Old description",
-            author=self.user,
-        )
-
-        response = self.client.patch(
-            reverse("ads:ads-detail", args=[ads.id]), {"title": "Updated Title"}
-        )
-
-        ads.refresh_from_db()
-
-        assert response.status_code == status.HTTP_200_OK
-        assert ads.title == "Updated Title"
-
-    def test_delete_ads(self):
-        ads = Ads.objects.create(
-            title="To be deleted",
-            price=100,
-            description="Delete this ads",
-            author=self.user,
-        )
-
-        response = self.client.delete(reverse("ads:ads-detail", args=[ads.id]))
-
-        assert response.status_code == status.HTTP_204_NO_CONTENT
+@pytest.fixture
+def ads_instance(user):
+    return Ads.objects.create(
+        title="Test Ads", price=100, description="Test description", author=user
+    )
 
 
 @pytest.mark.django_db
-class ReviewCaseTest(APITestCase):
-    def setUp(self):
-        self.user = User.objects.create(email="test@mail.ru", password="password")
-        self.ads = Ads.objects.create(title="Test", price=100, description="Test")
-        self.client.force_authenticate(user=self.user)
+def test_create_ads(authenticated_client):
+    response = authenticated_client.post(
+        reverse("ads:ads-list"),
+        {
+            "title": "New Ads",
+            "price": 150,
+            "description": "Description of new ads.",
+        },
+    )
 
-    def test_create_review(self):
-        response = self.client.post(
-            reverse("ads:review-list"),
-            {"text": "New Review", "author": self.user.id, "ad": self.ads.id},
-        )
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["title"] == "New Ads"
 
-        assert response.status_code == status.HTTP_201_CREATED
-        assert response.data["text"] == "New Review"
 
-    def test_list_review(self):
-        # Создаем несколько объявлений
-        Review.objects.create(text="Review 1", author=self.user, ad=self.ads)
-        Review.objects.create(text="Review 2", author=self.user, ad=self.ads)
+@pytest.mark.django_db
+def test_list_ads(authenticated_client, user):
+    Ads.objects.create(title="Ads 1", price=100, description="First ads", author=user)
+    Ads.objects.create(title="Ads 2", price=200, description="Second ads", author=user)
 
-        response = self.client.get(reverse("ads:review-list"))
+    response = authenticated_client.get(reverse("ads:ads-list"))
 
-        assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_200_OK
 
-    def test_retrieve_review(self):
-        review = Review.objects.create(
-            text="Test Review", author=self.user, ad=self.ads
-        )
 
-        response = self.client.get(reverse("ads:review-detail", args=[review.id]))
+@pytest.mark.django_db
+def test_retrieve_ads(authenticated_client, ads_instance):
+    response = authenticated_client.get(
+        reverse("ads:ads-detail", args=[ads_instance.id])
+    )
 
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["text"] == "Test Review"
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["title"] == "Test Ads"
 
-    def test_update_review(self):
-        review = Review.objects.create(text="Old Title", author=self.user, ad=self.ads)
 
-        response = self.client.patch(
-            reverse("ads:review-detail", args=[review.id]), {"text": "Updated Title"}
-        )
+@pytest.mark.django_db
+def test_update_ads(authenticated_client, ads_instance):
+    response = authenticated_client.patch(
+        reverse("ads:ads-detail", args=[ads_instance.id]), {"title": "Updated Title"}
+    )
 
-        review.refresh_from_db()
+    ads_instance.refresh_from_db()
 
-        assert response.status_code == status.HTTP_200_OK
-        assert review.text == "Updated Title"
+    assert response.status_code == status.HTTP_200_OK
+    assert ads_instance.title == "Updated Title"
 
-    def test_delete_review(self):
-        review = Review.objects.create(
-            text="To be deleted", author=self.user, ad=self.ads
-        )
 
-        response = self.client.delete(reverse("ads:review-detail", args=[review.id]))
+@pytest.mark.django_db
+def test_delete_ads(authenticated_client, ads_instance):
+    response = authenticated_client.delete(
+        reverse("ads:ads-detail", args=[ads_instance.id])
+    )
 
-        assert response.status_code == status.HTTP_204_NO_CONTENT
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+
+@pytest.fixture
+def review_instance(user, ads_instance):
+    return Review.objects.create(text="Test Review", author=user, ad=ads_instance)
+
+
+@pytest.mark.django_db
+def test_create_review(authenticated_client, ads_instance, user):
+    response = authenticated_client.post(
+        reverse("ads:review-list"),
+        {"text": "New Review", "author": user.id, "ad": ads_instance.id},
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["text"] == "New Review"
+
+
+@pytest.mark.django_db
+def test_list_review(authenticated_client, review_instance):
+    Review.objects.create(
+        text="Review 1", author=review_instance.author, ad=review_instance.ad
+    )
+    Review.objects.create(
+        text="Review 2", author=review_instance.author, ad=review_instance.ad
+    )
+
+    response = authenticated_client.get(reverse("ads:review-list"))
+
+    assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.django_db
+def test_retrieve_review(authenticated_client, review_instance):
+    response = authenticated_client.get(
+        reverse("ads:review-detail", args=[review_instance.id])
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["text"] == "Test Review"
+
+
+@pytest.mark.django_db
+def test_update_review(authenticated_client, review_instance):
+    response = authenticated_client.patch(
+        reverse("ads:review-detail", args=[review_instance.id]),
+        {"text": "Updated Title"},
+    )
+
+    review_instance.refresh_from_db()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert review_instance.text == "Updated Title"
+
+
+@pytest.mark.django_db
+def test_delete_review(authenticated_client, review_instance):
+    response = authenticated_client.delete(
+        reverse("ads:review-detail", args=[review_instance.id])
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
